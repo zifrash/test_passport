@@ -1,0 +1,64 @@
+version: '3'
+
+services:
+  php:
+    build:
+      context: ./
+      dockerfile: ./docker/php/Dockerfile
+      args:
+        TIMEZONE: ${TIMEZONE}
+    volumes:
+      - .:/var/www/html
+      - ./docker/php/custom.php.ini:/usr/local/etc/php/conf.d/custom.php.ini
+      - ./docker/timezone/${TIMEZONE}:/etc/localtime
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker/timezone/${TIMEZONE}:/etc/localtime
+    depends_on:
+      - php
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresdata:/var/lib/postgresql/data
+      - ./docker/timezone/${TIMEZONE}:/etc/localtime
+    environment:
+      - POSTGRES_DB=${DB_DATABASE}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - PGTZ=${TIMEZONE}
+    restart: unless-stopped
+
+###> doctrine/doctrine-bundle ###
+  database:
+    image: postgres:${POSTGRES_VERSION:-15}-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # You should definitely change the password in production
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
+      # - ./docker/db/data:/var/lib/postgresql/data:rw
+###< doctrine/doctrine-bundle ###
+
+volumes:
+  postgresdata:
+
+###> doctrine/doctrine-bundle ###
+  database_data:
+###< doctrine/doctrine-bundle ###
